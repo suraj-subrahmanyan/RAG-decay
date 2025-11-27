@@ -1,0 +1,90 @@
+local_dir: "downloads/" 
+output_dir: "dataset/"
+max_tokens: 2048
+max_chunks_allowed: 100
+max_chunk_characters: 1000000
+
+excluded_extensions:
+  - ".png"
+  - ".gif"
+  - ".bin"
+  - ".jpg"
+  - ".jpeg"
+  - ".mp4"
+  - ".csv"
+  - ".json"
+  - ".svg"
+  - ".ico"
+  - ".woff"
+  - ".woff2"
+  - ".ttf"
+  - ".eot"
+  - ".zip"
+  - ".tar"
+  - ".gz"
+
+# Use find_commit_hashes.py to automatically find actual commit hashes:
+#   python find_commit_hashes.py --config config.yaml --update --dates 2024-10-31 2025-10-31
+
+repositories:
+  langchain:
+    - name: "langchain"
+      github_url: "https://github.com/langchain-ai/langchain"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "langchainjs"
+      github_url: "https://github.com/langchain-ai/langchainjs"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "langchain-nextjs-template"
+      github_url: "https://github.com/langchain-ai/langchain-nextjs-template"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "chroma"
+      github_url: "https://github.com/chroma-core/chroma"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "openai-cookbook"
+      github_url: "https://github.com/openai/openai-cookbook"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "openai-python"
+      github_url: "https://github.com/openai/openai-python"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "llama_index"
+      github_url: "https://github.com/run-llama/llama_index"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "azure-openai-samples"
+      github_url: "https://github.com/Azure-Samples/openai"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "azure-search-openai-demo"
+      github_url: "https://github.com/Azure-Samples/azure-search-openai-demo"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+    
+    - name: "transformers"
+      github_url: "https://github.com/huggingface/transformers"
+      commits:
+        oct_2024: "COMMIT_HASH_OCT_2024"
+        oct_2025: "COMMIT_HASH_OCT_2025"
+        

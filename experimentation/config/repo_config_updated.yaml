@@ -1,0 +1,75 @@
+local_dir: downloads/
+output_dir: dataset/
+max_tokens: 2048
+max_chunks_allowed: 100
+max_chunk_characters: 1000000
+excluded_extensions:
+- .png
+- .gif
+- .bin
+- .jpg
+- .jpeg
+- .mp4
+- .csv
+- .json
+- .svg
+- .ico
+- .woff
+- .woff2
+- .ttf
+- .eot
+- .zip
+- .tar
+- .gz
+repositories:
+  langchain:
+  - name: langchain
+    github_url: https://github.com/langchain-ai/langchain
+    commits:
+      oct_2024: b1c16ce5b8db089fd57e8f9a4c92474887e8776d
+      oct_2025: f2dab562a89ae86d8147a73603610a2e9cad38bf
+  - name: langchainjs
+    github_url: https://github.com/langchain-ai/langchainjs
+    commits:
+      oct_2024: cef9b9ef7ff4a127d129a18aa5152cb7f710f4a5
+      oct_2025: 5d8b75f2ad32ac8b322e5d03b99ff2ee99515e81
+  - name: langchain-nextjs-template
+    github_url: https://github.com/langchain-ai/langchain-nextjs-template
+    commits:
+      oct_2024: 384d41434a8f21fe5d77ebb10eac0cb870ecab8a
+      oct_2025: 61cb0e703f316a6effff8d985373d26fe2ea7769
+  - name: chroma
+    github_url: https://github.com/chroma-core/chroma
+    commits:
+      oct_2024: 7ed8a0dfdd7444115ba95da9d89caba02a52febe
+      oct_2025: e25f526d1c6179e3436778e73a618d57edb83459
+  - name: openai-cookbook
+    github_url: https://github.com/openai/openai-cookbook
+    commits:
+      oct_2024: e3e9fc2628f220784ec1ca1e48e0e1ee3a76afe6
+      oct_2025: 78a581d58f3b0648d21cd13930d1ec21ad5397e4
+  - name: openai-python
+    github_url: https://github.com/openai/openai-python
+    commits:
+      oct_2024: 891e1c17b7fecbae34d1915ba90c15ddece807f9
+      oct_2025: d63c8bb708764b33bcb3c5a0302249865350118e
+  - name: llama_index
+    github_url: https://github.com/run-llama/llama_index
+    commits:
+      oct_2024: 35a13b96a61bbbbab026e1b8c5465d10dff0a759
+      oct_2025: e16ef226e30108ff63341b315c39ac760996ac95
+  - name: azure-openai-samples
+    github_url: https://github.com/Azure-Samples/openai
+    commits:
+      oct_2024: 65eaeaf1bfc8e5dbf63a3cedcd525657b4133404
+      oct_2025: 3e9b2798ad17cf3ba28490f62f2fc455f2c612f2
+  - name: azure-search-openai-demo
+    github_url: https://github.com/Azure-Samples/azure-search-openai-demo
+    commits:
+      oct_2024: d056032c594e9875f7133805e2b7fe2f2d649f20
+      oct_2025: ee14c51b3297f6c854ea6e21bef08dea5128af81
+  - name: transformers
+    github_url: https://github.com/huggingface/transformers
+    commits:
+      oct_2024: b53e44e847230a39caecc320527776ed80a3ceff
+      oct_2025: 0f2f4b6a8d47209eb407cb09a44dcd98c3a5538f
