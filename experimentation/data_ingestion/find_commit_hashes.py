@@ -192,11 +192,11 @@ def main():
     else:
         parser.print_help()
         print("Examples:")
-        print("# Find commit for a single date")
+        print("Find commit for a single date")
         print("python find_commit_hashes.py --repo-url https://github.com/langchain-ai/langchain --date 2024-10-31")
-        print("\n  # Find commits for multiple dates")
+        print("Find commits for multiple dates")
         print("python find_commit_hashes.py --repo-url https://github.com/langchain-ai/langchain --dates 2024-10-31 2025-10-31")
-        print("\n# Update entire config file")
+        print("Update entire config file")
         print("python find_commit_hashes.py --config config.yaml --update --dates 2024-10-31 2025-10-31")
 
 

@@ -23,9 +23,6 @@ excluded_extensions:
   - ".tar"
   - ".gz"
 
-# Use find_commit_hashes.py to automatically find actual commit hashes:
-#   python find_commit_hashes.py --config config.yaml --update --dates 2024-10-31 2025-10-31
-
 repositories:
   langchain:
     - name: "langchain"

@@ -36,10 +36,10 @@ This is where the process of finding the repository starts. Here are the files y
 ```bash
 python data_ingestion/find_commit_hashes.py --config config/repo_config.yaml  --update
 python data_ingestion/chunk_repos_commit.py --config config/repo_config_updated.yaml 
-python data_ingestion/concatenate_corpus.py --input-dir dataset
+python data_ingestion/concatenate_corpus.py --input-dir dataset/langchain/
 ```
 The file `commit_chunker.py` is based on a few files present in freshstack. The problem with the files in freshstack is that they download
-only the most recent versions of a repository. However, for our purposes, the ability to switch between multiple versions of a repository is important. Therefore, The code present in the file allows to specify which version of a repo to access before chunking it.
+only the most recent versions of a repository. However, for our purposes, the ability to switch between multiple versions (time periods) of a repository is important. Therefore, The code present in this file allows to specify which version of a repo to access before chunking it.
 **Note:** The chunking mechanism is the same as the one present in the orginal freshstack documentation. 
 
 3. Indexing
