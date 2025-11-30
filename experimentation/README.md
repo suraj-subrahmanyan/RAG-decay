@@ -8,6 +8,15 @@ The question this repo aims to answer is the following: Do retrieval scores chan
 The Code will aim to compare the Retrieval performance of the langchain repository at different points in time.
 
 
+## Pre-Requisite
+
+To run the conde below you must have the following 
+* `git`
+* `python 3.11`
+* `conda`
+* `pip`
+* `java 21` (according to pyserini/anserini documentation exactly that version)
+
 ## Setup
 
 1. Clone the repo
@@ -102,16 +111,30 @@ Methodology use to analyze the shift between versions
 python analysis/analyze_corpus_drift.py --v1 dataset/langchain/corpus_oct_2024.jsonl --v2 dataset/langchain/corpus_oct_2025.jsonl 
 ```
 
-3. Indexing
+4. Indexing
 
-Any RAG pipeline requires the usage of indexing to effeciently retrieve over the entire corpus. For the consistency with the original Freshstack paper, 
+Any RAG pipeline requires the usage of indexing to effeciently retrieval over the entire corpus. For the consistency with the original Freshstack paper, we use the following methods over the corpus being the chunked code files.
 
-BM25
-bge-gemma2
-e5-mistral
-Qwen3-Embedding
+* BM25
+* bge-gemma2
+* e5-mistral
+* Qwen3-Embedding
 
-4. Retrieval
+
+For indexing using BM25, use:
+```bash
+python indexing/build_bm25_index.py --config config/indexing_config.yaml 
+```
+
+To build the other supported dense indices, you may use
+```bash
+python indexing/build_dense_index.py --config config/indexing_config.yaml --model qwen
+python indexing/build_dense_index.py --config config/indexing_config.yaml --model e5
+python indexing/build_dense_index.py --config config/indexing_config.yaml --model bge
+```
+
+
+5. Retrieval
 
 Uses 
 Answer from stack overflow
@@ -120,7 +143,7 @@ Answers Generated from (Qwen 2.5)
 
 
 
-5. Judment pool
+6. Judment pool
 
 
 

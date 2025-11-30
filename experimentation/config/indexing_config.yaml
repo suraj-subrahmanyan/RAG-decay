@@ -1,0 +1,34 @@
+corpus_files:
+  oct_2024: "dataset/langchain/corpus_oct_2024.jsonl"
+  oct_2025: "dataset/langchain/corpus_oct_2025.jsonl"
+
+index_output_dir: "indices/"
+
+dense_models:
+  bge:
+    model_name: "BAAI/bge-multilingual-gemma2"
+    embedding_dim: 4096
+    batch_size: 8
+    max_length: 4096
+    
+  e5:
+    model_name: "intfloat/e5-mistral-7b-instruct"
+    embedding_dim: 4096
+    batch_size: 8
+    max_length: 4096
+  
+  qwen:
+    model_name: "Qwen/Qwen3-Embedding-4B"
+    embedding_dim: 4096
+    batch_size: 8
+    max_length: 8192
+
+# BM25 indexing settings
+bm25:
+  language: "en"
+  stemmer: "porter"
+  
+device: "cuda"
+
+# Progress tracking
+show_progress: true
