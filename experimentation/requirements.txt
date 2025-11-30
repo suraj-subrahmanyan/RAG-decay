@@ -16,3 +16,5 @@ pyserini
 faiss-gpu-cu12
 voyageai
 numpy
+matplotlib
+scikit-learn
