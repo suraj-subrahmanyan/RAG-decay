@@ -4,7 +4,7 @@ Evaluating retrieval performance on evolving documentation corpora.
 
 **Research Question:** How do retrieval scores change across different temporal snapshots of a corpus?
 
-**Key Finding:** 94.2% of ground truth documents from Oct 2024 no longer exist in Oct 2025.
+**Main Finding:** 94.2% of ground truth documents from Oct 2024 no longer exist in Oct 2025. This is important because FreshStack created annotations linked to specific doc IDs. The repos changed a lot between Oct 2024 to Oct 2025 (files were renamed, moved, split, or deleted) such that ID-based evals break becuase the IDs disappear although the content is still present. 
 
 ## Pre-Requisites
 
