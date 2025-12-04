@@ -1,0 +1,106 @@
+{
+  "overall": {
+    "chunks_2024": 49505,
+    "chunks_2025": 41124,
+    "chunk_change": -8381,
+    "chunk_change_pct": -16.929603070396926,
+    "chars_2024": 203196639,
+    "chars_2025": 173195350
+  },
+  "document_stability": {
+    "retained": 4776,
+    "retained_pct": 9.647510352489649,
+    "removed": 44729,
+    "removed_pct": 90.35248964751035,
+    "added": 36348,
+    "jaccard_similarity": 5.562997216171828
+  },
+  "ground_truth_impact": {
+    "total_relevant_docs": 1547,
+    "found_in_2024": 1547,
+    "found_in_2024_pct": 100.0,
+    "found_in_2025": 89,
+    "found_in_2025_pct": 5.753070458952812,
+    "lost": 1458,
+    "lost_pct": 94.24692954104718
+  },
+  "repository_changes": [
+    {
+      "repository": "llama_index",
+      "chunks_2024": 13899,
+      "chunks_2025": 10041,
+      "absolute_change": -3858,
+      "percent_change": -27.75739261817397
+    },
+    {
+      "repository": "transformers",
+      "chunks_2024": 13335,
+      "chunks_2025": 13851,
+      "absolute_change": 516,
+      "percent_change": 3.8695163104611963
+    },
+    {
+      "repository": "langchain",
+      "chunks_2024": 12017,
+      "chunks_2025": 3647,
+      "absolute_change": -8370,
+      "percent_change": -69.65132728634434
+    },
+    {
+      "repository": "langchainjs",
+      "chunks_2024": 4804,
+      "chunks_2025": 3956,
+      "absolute_change": -848,
+      "percent_change": -17.651956702747707
+    },
+    {
+      "repository": "chroma",
+      "chunks_2024": 1431,
+      "chunks_2025": 2971,
+      "absolute_change": 1540,
+      "percent_change": 107.6170510132774
+    },
+    {
+      "repository": "openai-cookbook",
+      "chunks_2024": 1383,
+      "chunks_2025": 1122,
+      "absolute_change": -261,
+      "percent_change": -18.872017353579174
+    },
+    {
+      "repository": "azure-openai",
+      "chunks_2024": 1340,
+      "chunks_2025": 0,
+      "absolute_change": -1340,
+      "percent_change": -100.0
+    },
+    {
+      "repository": "openai-python",
+      "chunks_2024": 652,
+      "chunks_2025": 1275,
+      "absolute_change": 623,
+      "percent_change": 95.5521472392638
+    },
+    {
+      "repository": "azure-search-openai-demo",
+      "chunks_2024": 557,
+      "chunks_2025": 1192,
+      "absolute_change": 635,
+      "percent_change": 114.0035906642729
+    },
+    {
+      "repository": "langchain-nextjs-template",
+      "chunks_2024": 96,
+      "chunks_2025": 106,
+      "absolute_change": 10,
+      "percent_change": 10.416666666666675
+    },
+    {
+      "repository": "azure-openai-samples",
+      "chunks_2024": 0,
+      "chunks_2025": 2979,
+      "absolute_change": 2979,
+      "percent_change": null
+    }
+  ]
+}
