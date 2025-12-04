@@ -1,0 +1,33 @@
+# FreshStack Temporal Corpus Drift Analysis
+# Python 3.10+
+
+# FreshStack framework
+freshstack
+
+# Data processing
+pandas>=2.0.0
+numpy>=1.24.0
+tqdm>=4.65.0
+
+# Retrieval
+pyserini>=0.22.0
+faiss-cpu>=1.7.4
+sentence-transformers>=2.2.0
+
+# Machine Learning
+torch>=2.0.0
+transformers>=4.30.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilities
+pyyaml>=6.0
+gitpython>=3.1.0
+huggingface-hub>=0.16.0
+
+# For GPU (optional, install separately)
+# faiss-gpu
+# bitsandbytes
+

@@ -1,0 +1,38 @@
+# Indices (too large even for LFS)
+indices/
+bm25_*/
+bge_*/
+*.faiss
+*.pkl
+
+# Downloaded repositories (temporary)
+downloads/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Logs
+*.log
+nohup.out
+
+# Environment
+.env
+*.env
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary
+*.tmp
+*.temp
+
+# HuggingFace cache
+.cache/
