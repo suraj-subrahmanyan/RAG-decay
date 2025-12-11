@@ -1,0 +1,34 @@
+# Queries file
+queries_file: "queries_answers.jsonl"
+
+# Index directories
+index_base_dir: "indices/"
+
+# Output directory for retrieval results
+output_dir: "retrieval_results/"
+
+# Retrieval parameters
+top_k: 20
+
+dense_models:
+  bge:
+    model_name: "BAAI/bge-multilingual-gemma2"
+    embedding_dim: 4096
+    batch_size: 8
+    max_length: 4096
+    
+  e5:
+    model_name: "intfloat/e5-mistral-7b-instruct"
+    embedding_dim: 4096
+    batch_size: 8
+    max_length: 4096
+  
+  qwen:
+    model_name: "Qwen/Qwen3-Embedding-4B"
+    embedding_dim: 4096
+    batch_size: 8
+    max_length: 4096
+
+device: "cuda"
+
+show_progress: true

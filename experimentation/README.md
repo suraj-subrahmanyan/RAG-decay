@@ -134,7 +134,26 @@ python indexing/build_dense_index.py --config config/indexing_config.yaml --mode
 ```
 
 
-5. Retrieval
+5. Query Preperation
+
+The ultimate goal is to create Judgement Pools, which are necessary for evaluating the relevance of retrieved information to a given query. Since judging all queries against their potential answers is prohibitively expensive, we focus on retrieving a subset of potentially relevant queries to form these pools.
+
+To find the potentially relevant queries, we employ two distinct retrieval settings: Oracle Retrieval and Inference Retrieval.
+
+| Retrieval Setting     | Source Text for Retrieval                                                 | Purpose                                                                                                                                                  |
+|-----------------------|---------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Oracle Retrieval**  | Stack Overflow Answers and GPT-4o Generated Nuggets (per the previous paper). | Uses **known relevant** information (the “oracle” answer/factoids) to find queries that should be relevant.                                               |
+| **Inference Retrieval** | Qwen-Generated Subquestions and Closed Book Answers.                       | Uses **synthetically generated** texts to simulate an inference step, finding queries relevant to intermediate or direct generated content.                |
+
+The execution steps to make this work are
+
+```bash
+python query_preparation/load_queries_answers.py
+python query_preparation/add_nuggets_to_queries.py
+python query_preparation/add_qwen_generation.py
+```
+
+6. Retrieval
 
 Uses 
 Answer from stack overflow

@@ -18,3 +18,4 @@ voyageai
 numpy
 matplotlib
 scikit-learn
+accelerate
