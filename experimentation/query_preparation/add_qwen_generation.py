@@ -1,17 +1,20 @@
 import argparse
 import json
 import logging
-import re
 import shutil
 from pathlib import Path
-from typing import List
+from typing import List, Dict, Any
 
 import torch
 import yaml
 from tqdm import tqdm
-from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from prompts import DECOMPOSITIONAL_QUERIES_PROMPT, DIRECT_ANSWER_PROMPT
+from langchain_huggingface import HuggingFacePipeline
+from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+from prompts import DECOMPOSITIONAL_QUERIES_PROMPT_TEMPLATE, DIRECT_ANSWER_PROMPT_TEMPLATE
 
 # Setup logging
 logging.basicConfig(
@@ -28,18 +31,18 @@ def load_config(config_path: str) -> dict:
         return yaml.safe_load(f)
 
 
-class QwenGenerator:
-    """Generator for Qwen model inference."""
+class QwenLangChainGenerator:
+    """Generator for Qwen model inference using LangChain."""
     
     def __init__(self, config: dict):
         """
-        Initialize Qwen model.
+        Initialize Qwen model with LangChain.
         
         Args:
             config: Configuration dictionary
         """
         model_config = config['model']
-        self.gen_config = config['generation']
+        gen_config = config['generation']
         
         logger.info(f"Loading model: {model_config['name']}")
         logger.info(f"Device: {model_config['device']}")
@@ -64,101 +67,70 @@ class QwenGenerator:
         ).to(model_config['device'])
         self.model.eval()
         
-        self.device = model_config['device']
-        logger.info("Model loaded successfully")
-    
-    def generate(self, prompt: str) -> str:
-        """
-        Generate text from prompt.
-        
-        Args:
-            prompt: Input prompt
-            
-        Returns:
-            Generated text
-        """
-        # Tokenize
-        inputs = self.tokenizer(
-            prompt,
-            return_tensors="pt",
-            truncation=True,
-        ).to(self.device)
-        
-        # Generate
-        with torch.inference_mode():
-            outputs = self.model.generate(
-                **inputs,
-                max_new_tokens=self.gen_config['max_new_tokens'],
-                temperature=self.gen_config['temperature'],
-                top_p=self.gen_config['top_p'],
-                do_sample=self.gen_config['do_sample'],
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-            )
-        
-        # Decode
-        generated_text = self.tokenizer.decode(
-            outputs[0][inputs['input_ids'].shape[1]:],  # Skip input prompt
-            skip_special_tokens=True
+        # Create pipeline
+        pipe = pipeline(
+            "text-generation",
+            model=self.model,
+            tokenizer=self.tokenizer,
+            max_new_tokens=gen_config['max_new_tokens'],
+            temperature=gen_config['temperature'],
+            top_p=gen_config['top_p'],
+            do_sample=gen_config['do_sample'],
+            return_full_text=False, # LangChain expects generation only
         )
         
-        return generated_text.strip()
-
-
-def parse_subquestions(generated_text: str) -> List[str]:
-    """
-    Parse subquestions from generated text.
-    
-    Expected format: (1) question (2) question (3) question
-    
-    Args:
-        generated_text: Generated text containing subquestions
+        self.llm = HuggingFacePipeline(pipeline=pipe)
         
-    Returns:
-        List of subquestions
-    """
-    # Look for "Sub-Questions" section
-    if "** Sub-Questions **:" in generated_text:
-        subq_section = generated_text.split("** Sub-Questions **:")[-1]
-    else:
-        subq_section = generated_text
-    
-    # Extract numbered questions
-    # Pattern: (1) text (2) text (3) text
-    pattern = r'\(\d+\)\s*([^(]+?)(?=\(\d+\)|$)'
-    matches = re.findall(pattern, subq_section, re.DOTALL)
-    
-    # Clean up matches
-    subquestions = [match.strip() for match in matches if match.strip()]
-    
-    return subquestions
-
-
-def parse_answer(generated_text: str) -> str:
-    """
-    Parse answer from generated text.
-    
-    Expected format: ** Reasoning **: ... ** Answer **: ...
-    
-    Args:
-        generated_text: Generated text containing answer
+        # Define parsers
+        self.json_parser = JsonOutputParser()
+        self.str_parser = StrOutputParser() # Fallback or for simple text
         
-    Returns:
-        Extracted answer
-    """
-    # Look for "Answer" section
-    if "** Answer **:" in generated_text:
-        answer_section = generated_text.split("** Answer **:")[-1]
-        return answer_section.strip()
+        # Define chains
+        self.subq_chain = (
+            DECOMPOSITIONAL_QUERIES_PROMPT_TEMPLATE 
+            | self.llm 
+            | self.json_parser
+        )
+        
+        self.answer_chain = (
+            DIRECT_ANSWER_PROMPT_TEMPLATE 
+            | self.llm 
+            | self.json_parser
+        )
+        
+        logger.info("LangChain chains initialized successfully")
     
-    # Fallback: return everything after reasoning
-    if "** Reasoning **:" in generated_text:
-        parts = generated_text.split("** Reasoning **:")
-        if len(parts) > 1:
-            return parts[-1].strip()
-    
-    # Last resort: return as-is
-    return generated_text.strip()
+    def generate_subquestions(self, question: str) -> List[str]:
+        """Generate subquestions using LangChain."""
+        try:
+            result = self.subq_chain.invoke({"question": question})
+            # Expecting {"subquestions": ["q1", "q2"]}
+            if isinstance(result, dict) and "subquestions" in result:
+                return result["subquestions"]
+            elif isinstance(result, list): # fallback if parser returns list directly
+                return result
+            else:
+                logger.warning(f"Unexpected subquestion format: {result}")
+                return []
+        except Exception as e:
+            logger.error(f"Error generating subquestions: {e}")
+            return []
+
+    def generate_answer(self, question: str) -> str:
+        """Generate answer using LangChain."""
+        try:
+            result = self.answer_chain.invoke({"question": question})
+            # Expecting {"answer": "text"}
+            if isinstance(result, dict) and "answer" in result:
+                return result["answer"]
+            elif isinstance(result, str):
+                return result
+            else:
+                logger.warning(f"Unexpected answer format: {result}")
+                return str(result)
+        except Exception as e:
+            logger.error(f"Error generating answer: {e}")
+            return ""
 
 
 def load_queries(queries_file: Path) -> List[dict]:
@@ -177,14 +149,14 @@ def load_queries(queries_file: Path) -> List[dict]:
 
 def generate_for_queries(
     queries: List[dict],
-    generator: QwenGenerator,
+    generator: QwenLangChainGenerator,
 ) -> List[dict]:
     """
     Generate closed-book answers and subquestions for all queries.
     
     Args:
         queries: List of query dictionaries
-        generator: QwenGenerator instance
+        generator: QwenLangChainGenerator instance
         
     Returns:
         Enriched queries
@@ -203,26 +175,16 @@ def generate_for_queries(
             enriched_queries.append(query)
             continue
         
-        try:
-            # Generate closed-book answer
-            answer_prompt = DIRECT_ANSWER_PROMPT.format(question=question)
-            answer_output = generator.generate(answer_prompt)
-            closed_book_answer = parse_answer(answer_output)
-            
-            # Generate subquestions
-            subq_prompt = DECOMPOSITIONAL_QUERIES_PROMPT.format(question=question)
-            subq_output = generator.generate(subq_prompt)
-            subquestions = parse_subquestions(subq_output)
-            
-            # Add to query
-            query['closed_book_answer'] = closed_book_answer
-            query['subquestions'] = subquestions
-            
-        except Exception as e:
-            logger.error(f"Error generating for query {query.get('query_id')}: {e}")
-            query['closed_book_answer'] = ""
-            query['subquestions'] = []
+        # Generate closed-book answer
+        closed_book_answer = generator.generate_answer(question)
         
+        # Generate subquestions
+        subquestions = generator.generate_subquestions(question)
+        
+        # Add to query
+        query['closed_book_answer'] = closed_book_answer
+        query['subquestions'] = subquestions
+            
         enriched_queries.append(query)
 
     
@@ -231,7 +193,7 @@ def generate_for_queries(
     # Statistics
     with_answers = sum(1 for q in enriched_queries if q.get('closed_book_answer'))
     with_subq = sum(1 for q in enriched_queries if q.get('subquestions'))
-    avg_subq = sum(len(q.get('subquestions', [])) for q in enriched_queries) / len(enriched_queries)
+    avg_subq = sum(len(q.get('subquestions', [])) for q in enriched_queries) / len(enriched_queries) if enriched_queries else 0
     
     logger.info(f"Queries with answers: {with_answers}/{len(enriched_queries)}")
     logger.info(f"Queries with subquestions: {with_subq}/{len(enriched_queries)}")
@@ -267,7 +229,7 @@ def save_queries(queries: List[dict], output_file: Path, backup_suffix: str):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Add Qwen-generated answers and subquestions to queries"
+        description="Add Qwen-generated answers and subquestions to queries using LangChain"
     )
     parser.add_argument(
         "--config",
@@ -278,14 +240,20 @@ def main():
     
     args = parser.parse_args()
     
-
-    logger.info("Add Qwen Generations to Queries")
+    logger.info("Add Qwen Generations to Queries (LangChain)")
     # Load config
     config = load_config(args.config)
     
-    
     # Initialize generator
-    generator = QwenGenerator(config)
+    try:
+        generator = QwenLangChainGenerator(config)
+    except ImportError as e:
+        logger.error(f"Failed to import necessary libraries: {e}")
+        logger.error("Please ensure langchain and langchain-huggingface are installed.")
+        return
+    except Exception as e:
+        logger.error(f"Failed to initialize generator: {e}")
+        return
     
     # Load queries
     queries_file = Path(config['queries_file'])
