@@ -1,5 +1,5 @@
 # Queries file
-queries_file: "queries_answers.jsonl"
+queries_file: "retrieval_results/queries_answers.jsonl"
 
 # Index directories
 index_base_dir: "indices/"

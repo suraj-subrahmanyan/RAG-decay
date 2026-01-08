@@ -11,7 +11,6 @@ from tqdm import tqdm
 
 from langchain_huggingface import HuggingFacePipeline
 from langchain_core.output_parsers import JsonOutputParser, StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
 from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
 
 from prompts import DECOMPOSITIONAL_QUERIES_PROMPT_TEMPLATE, DIRECT_ANSWER_PROMPT_TEMPLATE

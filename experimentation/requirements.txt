@@ -21,3 +21,6 @@ scikit-learn
 accelerate
 langchain
 langchain-huggingface
+pydantic
+langchain-core
+langchain-community
