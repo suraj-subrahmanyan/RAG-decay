@@ -1,0 +1,40 @@
+# Configuration for nugget-level relevance assessment
+
+# Model configuration
+model:
+  name: "Qwen/Qwen2.5-7B-Instruct"
+  device: "cuda"
+  torch_dtype: "bfloat16"  # bfloat16, float16, or float32
+  trust_remote_code: true
+
+# Generation parameters
+generation:
+  max_new_tokens: 4096
+  temperature: 0.1  # Low temperature for more deterministic judgments
+  top_p: 0.9
+  do_sample: true
+
+# Input paths
+queries_file: "retrieval_results/queries_answers.jsonl"
+corpus_base_dir: "dataset/langchain"
+retrieval_results_dir: "retrieval_results"
+
+# Output paths
+output_dir: "assessment_results"
+
+# Assessment parameters
+top_k: 20  # Maximum number of documents to assess per query
+batch_size: 1  # Process queries one at a time (each query has multiple docs+nuggets)
+
+# Corpus versions to process
+corpus_versions:
+  - "oct_2024"
+  - "oct_2025"
+
+# Retrieval methods to assess
+methods:
+  - "bge"
+  - "e5"
+  - "qwen"
+  - "bm25"
+  - "fusion"

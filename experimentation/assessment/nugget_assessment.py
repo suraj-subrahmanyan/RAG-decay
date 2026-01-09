@@ -1,0 +1,413 @@
+"""
+Nugget-level relevance assessment using Qwen model.
+
+This script assesses whether retrieved documents support the nuggets
+(factual statements) from Stack Overflow questions/answers.
+"""
+
+import argparse
+import json
+import logging
+from pathlib import Path
+from typing import List, Dict, Any
+from collections import defaultdict
+
+import torch
+import yaml
+from tqdm import tqdm
+from datasets import Dataset
+
+from langchain_huggingface import HuggingFacePipeline
+from langchain_core.output_parsers import JsonOutputParser
+from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+
+from prompts import NUGGET_SUPPORT_ASSESSMENT_PROMPT
+
+# Setup logging
+logging.basicConfig(
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+)
+logger = logging.getLogger(__name__)
+
+
+def load_config(config_path: str) -> dict:
+    """Load configuration from YAML file."""
+    with open(config_path, 'r') as f:
+        return yaml.safe_load(f)
+
+
+class QwenAssessor:
+    """Qwen model for nugget-level relevance assessment."""
+    
+    def __init__(self, config: dict):
+        """Initialize Qwen model."""
+        model_config = config['model']
+        gen_config = config['generation']
+        
+        logger.info(f"Loading model: {model_config['name']}")
+        
+        # Determine dtype
+        dtype_map = {
+            'bfloat16': torch.bfloat16,
+            'float16': torch.float16,
+            'float32': torch.float32
+        }
+        torch_dtype = dtype_map.get(model_config['torch_dtype'], torch.bfloat16)
+        
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            model_config['name'],
+            trust_remote_code=model_config.get('trust_remote_code', True)
+        )
+        
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_config['name'],
+            dtype=torch_dtype,
+            trust_remote_code=model_config.get('trust_remote_code', True)
+        ).to(model_config['device'])
+        self.model.eval()
+        
+        # Create pipeline
+        pipe = pipeline(
+            "text-generation",
+            model=self.model,
+            tokenizer=self.tokenizer,
+            max_new_tokens=gen_config['max_new_tokens'],
+            temperature=gen_config['temperature'],
+            top_p=gen_config['top_p'],
+            do_sample=gen_config['do_sample'],
+            return_full_text=False,
+        )
+        
+        self.llm = HuggingFacePipeline(pipeline=pipe)
+        self.json_parser = JsonOutputParser()
+        
+        # Create assessment chain
+        self.assessment_chain = (
+            NUGGET_SUPPORT_ASSESSMENT_PROMPT 
+            | self.llm 
+            | self.json_parser
+        )
+        
+        logger.info("Assessment chain initialized")
+    
+    def assess_nugget_support(
+        self,
+        nuggets: List[str],
+        documents: List[Dict[str, str]]
+    ) -> Dict[str, Any]:
+        """
+        Assess which documents support which nuggets.
+        
+        Args:
+            nuggets: List of nugget strings
+            documents: List of dicts with 'doc_id' and 'text' keys
+            
+        Returns:
+            Assessment results
+        """
+        # Format nuggets
+        nuggets_text = "\n".join([f"{i+1}. {nugget}" for i, nugget in enumerate(nuggets)])
+        
+        # Format documents
+        docs_text = "\n\n".join([
+            f"Document {i+1} (ID: {doc['doc_id']}):\n{doc['text'][:2000]}"  # Truncate long docs
+            for i, doc in enumerate(documents)
+        ])
+        
+        try:
+            result = self.assessment_chain.invoke({
+                "nuggets": nuggets_text,
+                "documents": docs_text,
+                "num_nuggets": len(nuggets)
+            })
+            return result
+        except Exception as e:
+            logger.error(f"Error in assessment: {e}")
+            # Return empty judgments on error
+            return {
+                "assessments": [
+                    {
+                        "doc_id": doc['doc_id'],
+                        "nugget_judgments": [0] * len(nuggets)
+                    }
+                    for doc in documents
+                ]
+            }
+
+
+def load_corpus_documents(corpus_file: Path) -> Dict[str, Dict]:
+    """
+    Load all documents from a single corpus file.
+    
+    Args:
+        corpus_file: Path to corpus_{version}.jsonl file
+        
+    Returns:
+        Dict mapping doc_id to document data
+    """
+    logger.info(f"Loading corpus from {corpus_file}")
+    
+    documents = {}
+    
+    if not corpus_file.exists():
+        logger.error(f"Corpus file not found: {corpus_file}")
+        return documents
+        
+    with open(corpus_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                doc = json.loads(line)
+                documents[doc['_id']] = doc
+    
+    logger.info(f"Loaded {len(documents)} documents")
+    return documents
+
+
+def load_queries(queries_file: Path) -> List[dict]:
+    """Load queries with nuggets."""
+    logger.info(f"Loading queries from {queries_file}")
+    
+    queries = []
+    with open(queries_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                queries.append(json.loads(line))
+    
+    logger.info(f"Loaded {len(queries)} queries")
+    return queries
+
+
+def load_retrieval_results(
+    results_file: Path,
+    top_k: int
+) -> Dict[str, List[Dict]]:
+    """
+    Load retrieval results grouped by query_id.
+    
+    Args:
+        results_file: Path to retrieval results JSONL
+        top_k: Maximum number of results per query
+        
+    Returns:
+        Dict mapping query_id to list of retrieval results
+    """
+    logger.info(f"Loading retrieval results from {results_file}")
+    
+    results_by_query = defaultdict(list)
+    
+    with open(results_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            if line.strip():
+                result = json.loads(line)
+                query_id = result['query_id']
+                results_by_query[query_id].append(result)
+    
+    # Sort by rank and limit to top_k
+    for query_id in results_by_query:
+        results_by_query[query_id] = sorted(
+            results_by_query[query_id],
+            key=lambda x: x['rank']
+        )[:top_k]
+    
+    logger.info(f"Loaded results for {len(results_by_query)} queries")
+    return dict(results_by_query)
+
+
+def assess_query(
+    query_data: dict,
+    retrieval_results: List[Dict],
+    corpus_docs: Dict[str, Dict],
+    assessor: QwenAssessor
+) -> List[Dict]:
+    """
+    Assess nugget support for a single query.
+    
+    Args:
+        query_data: Query with nuggets
+        retrieval_results: Retrieved documents for this query
+        corpus_docs: All corpus documents
+        assessor: QwenAssessor instance
+        
+    Returns:
+        List of retrieval results with nugget_level_judgment added
+    """
+    nuggets = query_data.get('nuggets', [])
+    
+    if not nuggets:
+        logger.warning(f"Query {query_data['query_id']} has no nuggets")
+        # Add 0 judgment to all results
+        for result in retrieval_results:
+            result['nugget_level_judgment'] = 0
+        return retrieval_results
+    
+    # Prepare documents for assessment
+    documents = []
+    for result in retrieval_results:
+        doc_id = result['doc_id']
+        if doc_id in corpus_docs:
+            doc = corpus_docs[doc_id]
+            documents.append({
+                'doc_id': doc_id,
+                'text': doc.get('text', '')
+            })
+        else:
+            logger.warning(f"Document {doc_id} not found in corpus")
+            documents.append({
+                'doc_id': doc_id,
+                'text': ''
+            })
+    
+    # Assess nugget support
+    assessment = assessor.assess_nugget_support(nuggets, documents)
+    
+    # Map assessments back to retrieval results
+    doc_judgments = {}
+    for doc_assessment in assessment.get('assessments', []):
+        if 'doc_id' not in doc_assessment:
+            logger.warning(f"Skipping malformed assessment: {doc_assessment}")
+            continue
+            
+        doc_id = doc_assessment['doc_id']
+        judgments = doc_assessment.get('nugget_judgments', [])
+        # Binary: 1 if any nugget is supported, 0 otherwise
+        doc_judgments[doc_id] = 1 if any(judgments) else 0
+    
+    # Add judgments to results
+    for result in retrieval_results:
+        result['nugget_level_judgment'] = doc_judgments.get(result['doc_id'], 0)
+    
+    return retrieval_results
+
+
+def process_method(
+    config: dict,
+    corpus_version: str,
+    method: str,
+    queries: List[dict],
+    corpus_docs: Dict[str, Dict],
+    assessor: QwenAssessor
+):
+    """Process assessment for a specific retrieval method."""
+    logger.info(f"Processing {method} for {corpus_version}")
+    
+    # Load retrieval results
+    results_dir = Path(config['retrieval_results_dir']) / corpus_version
+    results_file = results_dir / f"{method}.jsonl"
+    
+    if not results_file.exists():
+        logger.warning(f"Results file not found: {results_file}")
+        return
+    
+    retrieval_results = load_retrieval_results(results_file, config['top_k'])
+    
+    # Setup output
+    output_dir = Path(config['output_dir']) / corpus_version
+    output_dir.mkdir(parents=True, exist_ok=True)
+    output_file = output_dir / f"{method}_assessed.jsonl"
+    
+    # Process each query
+    logger.info(f"Assessing {len(queries)} queries...")
+    
+    with open(output_file, 'w', encoding='utf-8') as fout:
+        for query in tqdm(queries, desc=f"Assessing {method}"):
+            query_id = query['query_id']
+            
+            if query_id not in retrieval_results:
+                logger.warning(f"No retrieval results for query {query_id}")
+                continue
+            
+            # Assess this query
+            assessed_results = assess_query(
+                query,
+                retrieval_results[query_id],
+                corpus_docs,
+                assessor
+            )
+            
+            # Write results
+            for result in assessed_results:
+                fout.write(json.dumps(result, ensure_ascii=False) + "\n")
+    
+    logger.info(f"Results saved to {output_file}")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Nugget-level relevance assessment with Qwen"
+    )
+    parser.add_argument(
+        "--config",
+        type=str,
+        default="config/config_assessment.yaml",
+        help="Path to configuration file"
+    )
+    parser.add_argument(
+        "--corpus-version",
+        type=str,
+        choices=["oct_2024", "oct_2025", "all"],
+        default="all",
+        help="Corpus version to process"
+    )
+    parser.add_argument(
+        "--methods",
+        type=str,
+        nargs="+",
+        default=["bge", "qwen", "e5", "fusion", "bm25"],
+        help="Retrieval methods to assess (default: all from config)"
+    )
+    
+    args = parser.parse_args()
+    
+    # Load config
+    config = load_config(args.config)
+    
+    # Determine versions and methods
+    if args.corpus_version == "all":
+        versions = config['corpus_versions']
+    else:
+        versions = [args.corpus_version]
+    
+    if args.methods and "all" not in args.methods:
+        methods = args.methods
+    else:
+        methods = config['methods']
+    
+    logger.info(f"Nugget-Level Relevance Assessment")
+    logger.info(f"Corpus versions: {versions}")
+    logger.info(f"Methods: {methods}")
+    
+    # Initialize assessor
+    assessor = QwenAssessor(config)
+    
+    # Load queries
+    queries = load_queries(Path(config['queries_file']))
+    
+    # Process each version
+    for version in versions:
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Processing {version}")
+        logger.info(f"{'='*60}")
+        
+        # Load corpus for this version
+        corpus_file = Path(config['corpus_base_dir']) / f"corpus_{version}.jsonl"
+        corpus_docs = load_corpus_documents(corpus_file)
+        logger.info(f"Loaded {len(corpus_docs)} documents")
+        
+        # Process each method
+        for method in methods:
+            process_method(
+                config,
+                version,
+                method,
+                queries,
+                corpus_docs,
+                assessor
+            )
+    
+    logger.info("\nASSESSMENT COMPLETE")
+
+
+if __name__ == "__main__":
+    main()
