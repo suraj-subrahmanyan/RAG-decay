@@ -155,17 +155,120 @@ python query_preparation/add_qwen_generation.py
 
 6. Retrieval
 
-Uses 
-Answer from stack overflow
-Nuggets from GPT-4O
-Answers Generated from (Qwen 2.5)
+After indexing, retrieve documents using different methods and query formulations.
 
+### Dense Retrieval (BGE, E5, Qwen)
 
+Retrieve using dense embedding models:
 
-6. Judment pool
+```bash
+# BGE retrieval
+python retrieval/retrieval_dense.py --config config/config_retrieval.yaml --model bge --corpus-version oct_2024
 
+# E5 retrieval
+python retrieval/retrieval_dense.py --config config/config_retrieval.yaml --model e5 --corpus-version oct_2024
 
+# Qwen retrieval
+python retrieval/retrieval_dense.py --config config/config_retrieval.yaml --model qwen --corpus-version oct_2024
+```
 
+### BM25 Retrieval
 
+Retrieve using sparse BM25 method:
 
+```bash
+# BM25 retrieval for oct_2024
+python retrieval/retrieval_bm25.py --config config/config_retrieval.yaml --corpus-version oct_2024
+```
 
+### Fusion Retrieval
+
+Combine results from multiple retrieval methods:
+
+```bash
+# Fuse all methods (bm25, bge, e5, qwen)
+python retrieval/retrieval_fusion.py --config config/config_retrieval.yaml --corpus-version oct_2024
+
+# Fuse specific methods only
+python retrieval/retrieval_fusion.py --config config/config_retrieval.yaml --corpus-version oct_2024 --methods bge e5 qwen
+```
+
+### Query Fields
+
+All retrieval methods support multiple query formulations:
+- `answer`: Original Stack Overflow answer
+- `nuggets`: GPT-4o generated nuggets
+- `closed_book_answer`: Qwen-generated answer
+- `subquestions`: Qwen-generated subquestions
+
+Specify fields with `--query-fields`:
+```bash
+python retrieval/retrieval_dense.py --config config/config_retrieval.yaml --model bge --query-fields answer nuggets
+```
+
+### Output
+
+Results are saved to `retrieval_results/{corpus_version}/{method}.jsonl`:
+- `bge.jsonl`, `e5.jsonl`, `qwen.jsonl` - Dense retrieval results
+- `bm25.jsonl` - BM25 retrieval results
+- `fusion.jsonl` - Fused results from multiple methods
+
+Each line contains:
+```json
+{
+  "query_id": "75864073",
+  "answer_id": "75864224",
+  "doc_id": "langchain/docs/...",
+  "score": 0.85,
+  "rank": 1,
+  "query_field": "answer"
+}
+```
+
+7. Nugget-Level Relevance Assessment
+
+Assess whether retrieved documents support the nuggets using a Qwen model (following the FreshStack paper methodology).
+
+### Run Assessment
+
+```bash
+# Assess all methods for all corpus versions
+python assessment/nugget_assessment.py --config config/config_assessment.yaml
+
+# Assess specific corpus version
+python assessment/nugget_assessment.py --corpus-version oct_2024
+
+# Assess specific methods only
+python assessment/nugget_assessment.py --methods fusion bge --corpus-version oct_2024
+```
+
+### How It Works
+
+For each query:
+1. Loads nuggets (factual statements from Stack Overflow)
+2. Loads top-k retrieved documents
+3. Uses Qwen to assess if each document supports any nugget
+4. Adds binary `nugget_level_judgment` field (1=relevant, 0=not relevant)
+
+### Output
+
+Results saved to `assessment_results/{corpus_version}/{method}_assessed.jsonl`:
+
+```json
+{
+  "query_id": "75864073",
+  "answer_id": "75864224",
+  "doc_id": "langchain/docs/...",
+  "score": 0.85,
+  "rank": 1,
+  "query_field": "answer",
+  "nugget_level_judgment": 1
+}
+```
+
+### Configuration
+
+Edit `config/config_assessment.yaml` to configure:
+- Model settings (Qwen model, device, dtype)
+- Generation parameters (temperature, max_tokens)
+- Assessment parameters (top_k documents to assess)
