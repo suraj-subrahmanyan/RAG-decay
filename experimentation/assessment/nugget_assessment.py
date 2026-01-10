@@ -219,7 +219,8 @@ def assess_query(
     query_data: dict,
     retrieval_results: List[Dict],
     corpus_docs: Dict[str, Dict],
-    assessor: QwenAssessor
+    assessor: QwenAssessor,
+    doc_batch_size: int = 20
 ) -> List[Dict]:
     """
     Assess nugget support for a single query.
@@ -242,39 +243,48 @@ def assess_query(
             result['nugget_level_judgment'] = 0
         return retrieval_results
     
-    # Prepare documents for assessment
-    documents = []
-    for result in retrieval_results:
-        doc_id = result['doc_id']
-        if doc_id in corpus_docs:
-            doc = corpus_docs[doc_id]
-            documents.append({
-                'doc_id': doc_id,
-                'text': doc.get('text', '')
-            })
-        else:
-            logger.warning(f"Document {doc_id} not found in corpus")
-            documents.append({
-                'doc_id': doc_id,
-                'text': ''
-            })
-    
-    # Assess nugget support
-    assessment = assessor.assess_nugget_support(nuggets, documents)
-    
-    # Map assessments back to retrieval results
+    # Deduplicate documents for assessment
+    unique_doc_ids = list(set(r['doc_id'] for r in retrieval_results))
     doc_judgments = {}
-    for doc_assessment in assessment.get('assessments', []):
-        if 'doc_id' not in doc_assessment:
-            logger.warning(f"Skipping malformed assessment: {doc_assessment}")
+    
+    # Process in batches
+    for i in range(0, len(unique_doc_ids), doc_batch_size):
+        batch_ids = unique_doc_ids[i:i + doc_batch_size]
+        
+        # Prepare batch documents
+        batch_documents = []
+        for doc_id in batch_ids:
+            if doc_id in corpus_docs:
+                doc = corpus_docs[doc_id]
+                batch_documents.append({
+                    'doc_id': doc_id,
+                    'text': doc.get('text', '')
+                })
+            else:
+                logger.warning(f"Document {doc_id} not found in corpus")
+                batch_documents.append({
+                    'doc_id': doc_id,
+                    'text': ''
+                })
+        
+        # Assess batch
+        assessment = assessor.assess_nugget_support(nuggets, batch_documents)
+        
+        if not isinstance(assessment, dict):
+            logger.error(f"Assessment result is not a dict: {type(assessment)}")
             continue
             
-        doc_id = doc_assessment['doc_id']
-        judgments = doc_assessment.get('nugget_judgments', [])
-        # Binary: 1 if any nugget is supported, 0 otherwise
-        doc_judgments[doc_id] = 1 if any(judgments) else 0
-    
-    # Add judgments to results
+        # Collect judgments
+        for doc_assessment in assessment.get('assessments', []):
+            if 'doc_id' not in doc_assessment:
+                continue
+            
+            doc_id = doc_assessment['doc_id']
+            judgments = doc_assessment.get('nugget_judgments', [])
+            # Binary: 1 if any nugget is supported, 0 otherwise
+            doc_judgments[doc_id] = 1 if any(judgments) else 0
+
+    # Map judgments back to all results
     for result in retrieval_results:
         result['nugget_level_judgment'] = doc_judgments.get(result['doc_id'], 0)
     
@@ -323,7 +333,8 @@ def process_method(
                 query,
                 retrieval_results[query_id],
                 corpus_docs,
-                assessor
+                assessor,
+                config.get('doc_batch_size', 20)
             )
             
             # Write results

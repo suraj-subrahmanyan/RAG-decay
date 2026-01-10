@@ -23,8 +23,9 @@ retrieval_results_dir: "retrieval_results"
 output_dir: "assessment_results"
 
 # Assessment parameters
-top_k: 20  # Maximum number of documents to assess per query
-batch_size: 1  # Process queries one at a time (each query has multiple docs+nuggets)
+top_k: 80  # Maximum number of documents to assess per query
+batch_size: 1  # Process queries one at a time
+doc_batch_size: 20 # Number of documents to assess in a single LLM call (to avoid OOM)
 
 # Corpus versions to process
 corpus_versions:

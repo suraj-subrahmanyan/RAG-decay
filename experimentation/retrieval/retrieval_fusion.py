@@ -33,7 +33,7 @@ def load_method_results(results_base_dir: Path, method: str, query_id: str):
         query_id: Query identifier to filter results
     
     Returns:
-        Dict mapping doc_id to score for the specified query
+        Dict mapping query_field to {doc_id: score}
     """
     method_file = results_base_dir / f"{method}.jsonl"
     
@@ -41,7 +41,7 @@ def load_method_results(results_base_dir: Path, method: str, query_id: str):
         logger.warning(f"Results file not found: {method_file}")
         return {}
     
-    results = {}
+    results = defaultdict(dict)
     
     try:
         with open(method_file, 'r', encoding='utf-8') as f:
@@ -50,12 +50,13 @@ def load_method_results(results_base_dir: Path, method: str, query_id: str):
                     result = json.loads(line)
                     # Filter by query_id
                     if result['query_id'] == query_id:
-                        results[result['doc_id']] = result['score']
+                        field = result.get('query_field', 'unknown')
+                        results[field][result['doc_id']] = result['score']
     except Exception as e:
         logger.error(f"Error loading results from {method_file}: {e}")
         return {}
     
-    return results
+    return dict(results)
 
 
 def normalize_scores(scores: dict) -> dict:
@@ -179,50 +180,67 @@ def fuse_query_results(
     top_k: int
 ):
     """
-    Fuse results for a single query.
+    Fuse results for a single query, preserving query fields.
     
     Args:
         query_id: Query identifier
         results_base_dir: Base directory with method results
         methods: List of method names to fuse
         queries_file: Path to queries file (for metadata)
-        top_k: Number of results to output
+        top_k: Number of results to output per field
         
     Returns:
         List of result dictionaries, or None if no results found
     """
-    # Load results from each method
-    results_by_method = {}
+    # Load results from each method, grouped by field
+    # Structure: {method: {field: {doc_id: score}}}
+    results_by_method_field = {}
+    all_fields = set()
     
     for method in methods:
         results = load_method_results(results_base_dir, method, query_id)
         if results:
-            results_by_method[method] = results
+            results_by_method_field[method] = results
+            all_fields.update(results.keys())
     
-    if not results_by_method:
+    if not results_by_method_field:
         logger.warning(f"No results found for query {query_id}")
         return None
-    
-    # Fuse results
-    fused_results = fuse_results(results_by_method, top_k)
     
     # Get query metadata
     query_metadata = load_query_metadata(queries_file, query_id)
     answer_id = query_metadata.get('answer_id', '')
     
-    # Build result dictionaries
-    results_list = []
-    for doc_id, score, rank in fused_results:
-        result = {
-            'query_id': query_id,
-            'answer_id': answer_id,
-            'doc_id': doc_id,
-            'score': float(score),
-            'rank': rank
-        }
-        results_list.append(result)
+    all_fused_results = []
     
-    return results_list
+    # Fuse results per field
+    for field in all_fields:
+        # constant per field fusion
+        field_results_by_method = {}
+        
+        for method, method_results in results_by_method_field.items():
+            if field in method_results:
+                field_results_by_method[method] = method_results[field]
+        
+        if not field_results_by_method:
+            continue
+            
+        # Fuse results for this field
+        fused_results = fuse_results(field_results_by_method, top_k)
+        
+        # Build result dictionaries
+        for doc_id, score, rank in fused_results:
+            result = {
+                'query_id': query_id,
+                'answer_id': answer_id,
+                'doc_id': doc_id,
+                'score': float(score),
+                'rank': rank,
+                'query_field': field
+            }
+            all_fused_results.append(result)
+    
+    return all_fused_results
 
 
 def main():
