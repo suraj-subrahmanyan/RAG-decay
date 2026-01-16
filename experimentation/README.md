@@ -225,6 +225,17 @@ Each line contains:
 }
 ```
 
+### TREC Format Conversion
+
+To convert the JSONL results into a single TREC-formatted file (useful for evaluation with tools like `trec_eval`), run the `convert_to_trec.py` script.
+
+```bash
+python retrieval/convert_to_trec.py --base-dir retrieval_results
+```
+
+This will create a file at `retrieval_results/trec_runs/all_runs.trec` containing aggregated results from both `oct_2024` and `oct_2025` for all retrieval methods and query fields.
+
+
 7. Nugget-Level Relevance Assessment
 
 Assess whether retrieved documents support the nuggets using a Qwen model (following the FreshStack paper methodology).
