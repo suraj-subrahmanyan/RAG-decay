@@ -248,7 +248,7 @@ def assess_query(
     doc_judgments = {}
     
     # Process in batches
-    for i in range(0, len(unique_doc_ids), doc_batch_size):
+    for i in tqdm(range(0, len(unique_doc_ids), doc_batch_size), leave=False, desc="Assessing nugget support"):
         batch_ids = unique_doc_ids[i:i + doc_batch_size]
         
         # Prepare batch documents
@@ -317,11 +317,40 @@ def process_method(
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"{method}_assessed.jsonl"
     
-    # Process each query
-    logger.info(f"Assessing {len(queries)} queries...")
+    processed_queries = set()
+    write_mode = 'w'
     
-    with open(output_file, 'w', encoding='utf-8') as fout:
-        for query in tqdm(queries, desc=f"Assessing {method}"):
+    if output_file.exists() and not config.get('overwrite', False):
+        logger.info(f"Checking for existing results in {output_file}")
+        try:
+            with open(output_file, 'r', encoding='utf-8') as f:
+                for line in f:
+                    if line.strip():
+                        try:
+                            result = json.loads(line)
+                            processed_queries.add(result['query_id'])
+                        except json.JSONDecodeError:
+                            continue
+            logger.info(f"Found {len(processed_queries)} already processed queries. Resuming...")
+            write_mode = 'a'
+        except Exception as e:
+            logger.warning(f"Error reading existing results: {e}. Starting fresh.")
+            write_mode = 'w'
+    else:
+        logger.info("Starting fresh assessment (overwrite or new file)")
+        
+    # Filter queries
+    queries_to_process = [q for q in queries if q['query_id'] not in processed_queries]
+    
+    if not queries_to_process:
+        logger.info(f"All {len(queries)} queries already assessed for {method}. Skipping.")
+        return
+
+    # Process each query
+    logger.info(f"Assessing {len(queries_to_process)} queries (skipped {len(processed_queries)})...")
+    
+    with open(output_file, write_mode, encoding='utf-8') as fout:
+        for query in tqdm(queries_to_process, desc=f"Assessing {method}"):
             query_id = query['query_id']
             
             if query_id not in retrieval_results:
@@ -340,6 +369,7 @@ def process_method(
             # Write results
             for result in assessed_results:
                 fout.write(json.dumps(result, ensure_ascii=False) + "\n")
+            fout.flush()
     
     logger.info(f"Results saved to {output_file}")
 
@@ -368,11 +398,17 @@ def main():
         default=["bge", "qwen", "e5", "fusion", "bm25"],
         help="Retrieval methods to assess (default: all from config)"
     )
+    parser.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="Overwrite existing results instead of resuming"
+    )
     
     args = parser.parse_args()
     
     # Load config
     config = load_config(args.config)
+    config['overwrite'] = args.overwrite
     
     # Determine versions and methods
     if args.corpus_version == "all":
