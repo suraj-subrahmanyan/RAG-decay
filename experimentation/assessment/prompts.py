@@ -4,40 +4,52 @@ Prompts for nugget-level relevance assessment.
 
 from langchain_core.prompts import PromptTemplate
 
-NUGGET_SUPPORT_ASSESSMENT_PROMPT = PromptTemplate(
-    input_variables=["nuggets", "documents"],
-    template="""You are an expert at assessing whether documents contain information that supports specific factual statements (nuggets).
+FRESHRAG_LISTWISE_NUGGET_V4 = PromptTemplate(
+    input_variables=["question", "answer", "nuggets", "context", "count"],
+    template="""In this task, you will provide the exhaustive list of documents (either a code snippet or documentation) which sufficiently supports a decompositional fact.
 
-Your task is to determine if each retrieved document supports any of the given nuggets from a Stack Overflow question/answer.
+You will first read the question and the answer, next read each decompositional fact carefully one by one which will be provided to you. You must carefully analyze every one of {count} documents provided to you and judge each document and whether it sufficiently supports or does not support the decompositional fact. Read every fact and document pair carefully as you would when proofreading.
 
-**Nuggets (factual statements to verify):**
-{nuggets}
+It may be helpful to ask yourself, "Which list of documents can provide sufficient evidence required to support the decompositional fact?" Be sure to check all of the information in the document. You will be given two options to choose from:
 
-**Retrieved Documents:**
-{documents}
+- "Full Support": The document is sufficient in supporting the answer for the question and entailing *all* necessary parts of the decompositional fact.
+- "No Support": The document does not support the answer for the question and *does not* provide information in entailing the decompositional fact.
 
-**Instructions:**
-1. For each document, carefully read its content
-2. For each nugget, determine if the document contains information that supports or confirms that nugget
-3. A document supports a nugget if it contains the same information, explains the concept, or provides evidence for the claim
-4. Be strict: only mark as supporting (1) if there is clear evidence in the document
-5. Mark as not supporting (0) if the information is absent, contradictory, or only tangentially related
-
-**Output Format:**
+** Output Format **:
 Return a JSON object with the following structure:
 {{
   "assessments": [
     {{
-      "doc_id": "document_id_1",
-      "nugget_judgments": [1, 0, 1, ...]  // Binary list: 1 if doc supports nugget i, 0 otherwise
+      "nugget_index": 1,
+      "supported_documents": [
+        {{
+          "doc_index": 1,
+          "reasoning": "Reason why document 1 supports this nugget..."
+        }},
+        {{
+          "doc_index": 4,
+          "reasoning": "Reason why document 4 supports this nugget..."
+        }}
+      ] 
     }},
     ...
   ]
 }}
 
-The nugget_judgments list must have exactly {num_nuggets} elements (one per nugget), in the same order as the nuggets listed above.
+** Important **:
+- You must provide an assessment for EVERY nugget. If there are 3 nuggets, you must provide 3 assessments.
+- The nuggets are provided in the 'Decompositional Facts' section. 1-based indexing.
+- Ensure `nugget_index` matches the provided nuggets order.
+- `supported_documents` must contain a list of objects, each with a "doc_index" (1-based integer from "Document (i)") and a "reasoning" string.
+- If no documents support a nugget, `supported_documents` should be an empty list [].
 
-Do not include any reasoning or explanations. Output ONLY the JSON object.
+** Question **: {question}
 
-Output:"""
+** Answer **: {answer}
+
+** Decompositional Facts **: {nuggets}
+
+** Documents **: {context}
+
+** Output **:"""
 )

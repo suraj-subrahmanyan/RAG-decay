@@ -1,10 +1,3 @@
-"""
-Nugget-level relevance assessment using Qwen model.
-
-This script assesses whether retrieved documents support the nuggets
-(factual statements) from Stack Overflow questions/answers.
-"""
-
 import argparse
 import json
 import logging
@@ -17,11 +10,12 @@ import yaml
 from tqdm import tqdm
 from datasets import Dataset
 
-from langchain_huggingface import HuggingFacePipeline
-from langchain_core.output_parsers import JsonOutputParser
-from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+from pydantic import BaseModel
+import outlines
+from outlines import models
+from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from prompts import NUGGET_SUPPORT_ASSESSMENT_PROMPT
+from prompts import FRESHRAG_LISTWISE_NUGGET_V4
 
 # Setup logging
 logging.basicConfig(
@@ -30,6 +24,20 @@ logging.basicConfig(
     level=logging.INFO,
 )
 logger = logging.getLogger(__name__)
+
+
+class SupportedDocument(BaseModel):
+    doc_index: int
+    reasoning: str
+
+
+class NuggetJudgment(BaseModel):
+    nugget_index: int
+    supported_documents: List[SupportedDocument]
+
+
+class AssessmentResponse(BaseModel):
+    assessments: List[NuggetJudgment]
 
 
 def load_config(config_path: str) -> dict:
@@ -42,7 +50,7 @@ class QwenAssessor:
     """Qwen model for nugget-level relevance assessment."""
     
     def __init__(self, config: dict):
-        """Initialize Qwen model."""
+        """Initialize Qwen model with Outlines."""
         model_config = config['model']
         gen_config = config['generation']
         
@@ -55,58 +63,33 @@ class QwenAssessor:
             'float32': torch.float32
         }
         torch_dtype = dtype_map.get(model_config['torch_dtype'], torch.bfloat16)
-        
-        self.tokenizer = AutoTokenizer.from_pretrained(
-            model_config['name'],
-            trust_remote_code=model_config.get('trust_remote_code', True)
-        )
-        
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_config['name'],
+
+        # Initialize Outlines model
+        hf_tokenizer = AutoTokenizer.from_pretrained(model_config['name'])
+        hf_model = AutoModelForCausalLM.from_pretrained(
+            model_config['name'], 
             dtype=torch_dtype,
-            trust_remote_code=model_config.get('trust_remote_code', True)
+            trust_remote_code=model_config.get('trust_remote_code', True),
+            attn_implementation="flash_attention_2"
         ).to(model_config['device'])
-        self.model.eval()
         
-        # Create pipeline
-        pipe = pipeline(
-            "text-generation",
-            model=self.model,
-            tokenizer=self.tokenizer,
-            max_new_tokens=gen_config['max_new_tokens'],
-            temperature=gen_config['temperature'],
-            top_p=gen_config['top_p'],
-            do_sample=gen_config['do_sample'],
-            return_full_text=False,
-        )
+        self.model = outlines.from_transformers(hf_model, hf_tokenizer)
         
-        self.llm = HuggingFacePipeline(pipeline=pipe)
-        self.json_parser = JsonOutputParser()
-        
-        # Create assessment chain
-        self.assessment_chain = (
-            NUGGET_SUPPORT_ASSESSMENT_PROMPT 
-            | self.llm 
-            | self.json_parser
-        )
-        
-        logger.info("Assessment chain initialized")
+        logger.info("Outlines generator initialized")
     
     def assess_nugget_support(
         self,
+        question: str,
+        answer: str,
         nuggets: List[str],
         documents: List[Dict[str, str]]
-    ) -> Dict[str, Any]:
+    ) -> AssessmentResponse:
         """
         Assess which documents support which nuggets.
-        
-        Args:
-            nuggets: List of nugget strings
-            documents: List of dicts with 'doc_id' and 'text' keys
-            
-        Returns:
-            Assessment results
         """
+        if not documents:
+            return {"assessments": []}
+
         # Format nuggets
         nuggets_text = "\n".join([f"{i+1}. {nugget}" for i, nugget in enumerate(nuggets)])
         
@@ -117,24 +100,40 @@ class QwenAssessor:
         ])
         
         try:
-            result = self.assessment_chain.invoke({
-                "nuggets": nuggets_text,
-                "documents": docs_text,
-                "num_nuggets": len(nuggets)
-            })
-            return result
+            # Format prompt explicitly since we are not using LangChain chain
+            prompt = FRESHRAG_LISTWISE_NUGGET_V4.format(
+                question=question,
+                answer=answer,
+                nuggets=nuggets_text,
+                context=docs_text,
+                count=len(documents)
+            )
+            #logging.info(prompt)
+
+            result_pydantic = self.model(
+                prompt,
+                AssessmentResponse,
+                max_new_tokens=4096,
+                temperature=0.1
+            )
+            #logging.info(type(result_pydantic))
+            #logging.info(type(AssessmentResponse.model_validate_json(result_pydantic)))
+            #logging.info(AssessmentResponse.model_validate_json(result_pydantic))
+            
+            # Return Pydantic object directly
+            return AssessmentResponse.model_validate_json(result_pydantic)
         except Exception as e:
             logger.error(f"Error in assessment: {e}")
             # Return empty judgments on error
-            return {
-                "assessments": [
-                    {
-                        "doc_id": doc['doc_id'],
-                        "nugget_judgments": [0] * len(nuggets)
-                    }
-                    for doc in documents
+            return AssessmentResponse(
+                assessments=[
+                    NuggetJudgment(
+                        nugget_index=i+1,
+                        supported_documents=[]
+                    )
+                    for i in range(len(nuggets))
                 ]
-            }
+            )
 
 
 def load_corpus_documents(corpus_file: Path) -> Dict[str, Dict]:
@@ -268,25 +267,52 @@ def assess_query(
                 })
         
         # Assess batch
-        assessment = assessor.assess_nugget_support(nuggets, batch_documents)
+        assessment = assessor.assess_nugget_support(
+            query_data.get('question', ''),
+            query_data.get('answer', ''),
+            nuggets,
+            batch_documents
+        )
         
-        if not isinstance(assessment, dict):
-            logger.error(f"Assessment result is not a dict: {type(assessment)}")
+        # Handle AssessmentResponse object
+        if isinstance(assessment, AssessmentResponse):
+            assessments_list = assessment.assessments
+        else:
+            logger.error(f"Assessment result is not an AssessmentResponse: {type(assessment)}")
             continue
             
+        # Initialize judgments for this batch
+        # Map 1-based index to doc_id
+        index_to_doc_id = {j+1: doc['doc_id'] for j, doc in enumerate(batch_documents)}
+        
+        # Initialize batch doc judgments if not exists
+        for doc_id in batch_ids:
+            if doc_id not in doc_judgments:
+                doc_judgments[doc_id] = {'score': 0, 'details': []}
+
         # Collect judgments
-        for doc_assessment in assessment.get('assessments', []):
-            if 'doc_id' not in doc_assessment:
-                continue
+        for item in assessments_list:
+            # item is NuggetJudgment
+            nugget_index = item.nugget_index
+            supported_docs = item.supported_documents
             
-            doc_id = doc_assessment['doc_id']
-            judgments = doc_assessment.get('nugget_judgments', [])
-            # Binary: 1 if any nugget is supported, 0 otherwise
-            doc_judgments[doc_id] = 1 if any(judgments) else 0
+            for doc_support in supported_docs:
+                doc_idx = doc_support.doc_index
+                reasoning = doc_support.reasoning
+                
+                if doc_idx in index_to_doc_id:
+                    supported_doc_id = index_to_doc_id[doc_idx]
+                    doc_judgments[supported_doc_id]['score'] = 1
+                    doc_judgments[supported_doc_id]['details'].append({
+                        'nugget_index': nugget_index,
+                        'reasoning': reasoning
+                    })
 
     # Map judgments back to all results
     for result in retrieval_results:
-        result['nugget_level_judgment'] = doc_judgments.get(result['doc_id'], 0)
+        judgment_info = doc_judgments.get(result['doc_id'], {'score': 0, 'details': []})
+        result['nugget_level_judgment'] = judgment_info['score']
+        result['nugget_support_details'] = judgment_info['details']
     
     return retrieval_results
 
@@ -388,14 +414,14 @@ def main():
         "--corpus-version",
         type=str,
         choices=["oct_2024", "oct_2025", "all"],
-        default="all",
+        default="oct_2025",
         help="Corpus version to process"
     )
     parser.add_argument(
         "--methods",
         type=str,
         nargs="+",
-        default=["bge", "qwen", "e5", "fusion", "bm25"],
+        default=["fusion"], # ["bge", "qwen", "e5", "fusion", "bm25"]
         help="Retrieval methods to assess (default: all from config)"
     )
     parser.add_argument(
