@@ -1,23 +1,7 @@
 """
-FreshStack Official Evaluation Script
-======================================
+Evaluation script using FreshStack's EvaluateRetrieval class.
 
-Uses FreshStack's official EvaluateRetrieval class for correct metric calculation.
-
-Calculates:
-- α-nDCG@k (diversity-aware nDCG, supports k≤20)
-- Coverage@k (nugget coverage)
-- Recall@k (document recall)
-
-Input: Assessed retrieval results (JSONL format from nugget_assessment_listwise.py)
-Output: metrics.json with all evaluation results
-
-Usage:
-    python run_evaluation.py \\
-        --assessed_file assessed/bge_2024_assessed.jsonl \\
-        --output metrics/bge_2024_metrics.json \\
-        --topic langchain \\
-        --k_values 5 10 20 50
+Computes α-nDCG@k, Coverage@k, and Recall@k from assessed retrieval results.
 """
 
 import argparse

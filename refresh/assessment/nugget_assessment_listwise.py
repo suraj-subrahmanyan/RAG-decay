@@ -1,9 +1,8 @@
 """
-Nugget-Level Listwise Assessment
+Listwise nugget-level assessment using LLM-as-judge.
 
-Performs listwise relevance assessment where an LLM judges which retrieved
-documents provide full support for each atomic fact (nugget) decomposed from
-reference answers. Uses the FreshStack listwise evaluation methodology.
+Judges which retrieved documents fully support each atomic fact (nugget)
+decomposed from reference answers. Implements FreshStack listwise methodology.
 """
 
 import argparse

@@ -1,17 +1,8 @@
 """
-Analysis and Visualization for Temporal Decay Study
-====================================================
+Analysis and visualization for temporal decay experiments.
 
-Generates comprehensive analysis and visualizations:
-- Temporal decay analysis (2024 vs 2025 performance)
-- Method comparison (BM25 vs BGE vs Fusion)
-- Query field comparison
-- Statistical significance tests
-
-Reference: FreshStack paper Section 5
-
-Usage:
-    python run_analysis.py --eval_results evaluation_results/evaluation_metrics.json
+Compares retrieval performance across time periods (2024 vs 2025),
+methods (BM25, BGE, Fusion), and query formulations with statistical tests.
 """
 
 import argparse

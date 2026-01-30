@@ -1,19 +1,8 @@
 """
-Dense retrieval using BGE, E5, or Qwen models with FAISS and multiple query fields.
+Dense retrieval using BGE, E5, or Qwen embedding models with FAISS indices.
 
-This script retrieves documents using different query formulations:
-- question: Original question field (baseline/inference)
-- answer: Original answer field (oracle)
-- nuggets: Concatenated nuggets (oracle)
-- closed_book_answer: Qwen-generated answer (inference)
-- subquestions: Concatenated Qwen subquestions (inference)
-
-Usage:
-    # Process all 5 fields (default)
-    python retrieval_dense.py --config config_retrieval.yaml --model bge --corpus-version all
-    
-    # Process specific fields only
-    python retrieval_dense.py --config config_retrieval.yaml --model bge --corpus-version oct_2024 --query-fields question answer nuggets
+Supports multiple query formulations: question, answer, nuggets, closed_book_answer,
+and subquestions. Applies E5-specific instruction prefix when necessary.
 """
 
 import argparse
@@ -43,16 +32,11 @@ def load_config(config_path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def load_indexing_config(config_path: str) -> dict:
-    """Load indexing configuration for model details."""
-    with open(config_path, 'r') as f:
-        return yaml.safe_load(f)
-
-
 class QueryEncoder:
     """Encoder for query texts."""
     
     def __init__(self, model_name: str, device: str = "cuda", max_length: int = 512):
+        self.model_name = model_name
         self.device = device
         self.max_length = max_length
         
@@ -61,7 +45,9 @@ class QueryEncoder:
         logger.info(f"Model loaded on {device}")
     
     def encode(self, text: str) -> np.ndarray:
-        """Encode a single query text."""
+        """Encode a single query text, applying E5 prefix if necessary."""
+        if "e5" in self.model_name.lower():
+            text = f"Instruct: Given a web search query, retrieve relevant passages that answer the query\nQuery: {text}"
         document_embeddings = self.model.encode(text, show_progress_bar=False, convert_to_numpy=True)
         return document_embeddings
 

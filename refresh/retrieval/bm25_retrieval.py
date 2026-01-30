@@ -1,18 +1,7 @@
 """
-BM25 retrieval using Pyserini with multiple query fields.
+BM25 sparse retrieval using Pyserini with multiple query formulations.
 
-This script retrieves documents using different query formulations:
-- answer: Original answer field
-- nuggets: Concatenated nuggets
-- closed_book_answer: Qwen-generated answer
-- subquestions: Concatenated Qwen subquestions
-
-Usage:
-    # Process all 4 fields (default)
-    python retrieval_bm25.py --config config_retrieval.yaml --corpus-version oct_2024
-    
-    # Process specific fields only
-    python retrieval_bm25.py --config config_retrieval.yaml --corpus-version oct_2024 --query-fields answer nuggets
+Supports answer, nuggets, closed_book_answer, and subquestions fields.
 """
 
 import argparse

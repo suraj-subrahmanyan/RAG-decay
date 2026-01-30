@@ -23,7 +23,7 @@ def load_config(config_path: str) -> Dict:
 def load_model(model_config: Dict, device: str):
     model_name = model_config['model_name']
     dtype_str = model_config.get('dtype', 'float16')
-    # CRITICAL: Get max_length from config, default to 4096 if missing
+    # Get max_length from config, default to 4096 if missing
     max_length = model_config.get('max_length', 4096)
     
     print(f"Loading model: {model_name}")
@@ -99,8 +99,18 @@ def build_index(config: Dict, model_key: str, corpus_version: str, output_dir: s
 
     print(f"Loaded {len(texts):,} documents.")
 
-    # Initialize FAISS
-    dimension = model_conf['embedding_dim']
+    # Initialize FAISS with dimension auto-detection
+    print("Detecting embedding dimension...")
+    dummy_emb = model.encode("test", convert_to_numpy=True, normalize_embeddings=True)
+    actual_dim = dummy_emb.shape[0]
+    
+    config_dim = model_conf['embedding_dim']
+    if actual_dim != config_dim:
+        print(f"WARNING: Configured dimension ({config_dim}) does not match model's actual dimension ({actual_dim}). Using model's dimension.")
+        dimension = actual_dim
+    else:
+        dimension = config_dim
+    
     index = faiss.IndexFlatIP(dimension)
     
     print(f"Encoding {len(texts)} documents with Smart Batching...")

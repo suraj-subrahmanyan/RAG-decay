@@ -1,12 +1,9 @@
 """
-Nugget-Level Listwise Assessment using LLM-as-Judge
+Nugget-level relevance assessment using LLM-as-judge.
 
-This script performs nugget-level relevance assessment where an LLM judges
-which retrieved documents provide sufficient support for atomic facts (nuggets)
-decomposed from reference answers.
-
-Implementation uses native Transformers with text-based output parsing following
-the FreshStack methodology for decompositional fact verification.
+Determines which retrieved documents provide sufficient support for atomic facts
+(nuggets) decomposed from reference answers. Uses native Transformers with
+text-based output parsing.
 """
 
 import argparse
@@ -389,7 +386,7 @@ def process_method(
                     for nug_idx in supported_nuggets
                 ]
                 
-                # Write output (matching Nathan's format for compatibility)
+                # Write assessment output
                 output = {
                     "query_id": query_id,
                     "answer_id": query.get('answer_id', ''),

@@ -1,14 +1,8 @@
 """
-Create Judgment Pools from Retrieval Results
-=============================================
+Create judgment pools from retrieval results using TREC-style depth pooling.
 
-Combines top-k documents from all retrieval methods to create judgment pools.
-This is a standard IR evaluation approach (TREC-style pooling).
-
-Reference: FreshStack paper Section 3.3
-
-Usage:
-    python create_judgment_pools.py --results_dir retrieval_results --k 100
+Combines top-k documents from all retrieval methods to form a unified pool
+for assessment, enabling fair comparison across different retrieval systems.
 """
 
 import argparse
