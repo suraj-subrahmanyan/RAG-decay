@@ -100,30 +100,34 @@ def plot_overlap_heatmap(
     """Generate overlap heatmap."""
     set_sigir_style()
     
-    mask = np.triu(np.ones_like(jaccard_matrix, dtype=bool))
+    # Slice to show only lower triangle without diagonal
+    # Rows: BGE, E5, Qwen (skip BM25)
+    # Cols: BM25, BGE, E5 (skip Qwen)
+    plot_data = jaccard_matrix[1:, :-1]
     
-    fig, ax = plt.subplots(figsize=(5, 4))
+    fig, ax = plt.subplots(figsize=(6, 5))
     
     sns.heatmap(
-        jaccard_matrix,
-        mask=mask,
+        plot_data,
         cmap="YlOrRd",
         vmin=0.0,
-        vmax=1.0,
+        vmax=0.3,  # Match actual data range for better contrast
         square=True,
-        linewidths=0.5,
+        linewidths=1.0,
+        linecolor='white',
         annot=True,
         fmt=".2f",
         cbar_kws={"shrink": 0.8, "label": "Jaccard Similarity"},
-        xticklabels=[m.upper() for m in methods],
-        yticklabels=[m.upper() for m in methods],
+        xticklabels=[m.upper() for m in methods[:-1]],
+        yticklabels=[m.upper() for m in methods[1:]],
         ax=ax,
-        annot_kws={"fontsize": 9, "fontweight": "bold"}
+        annot_kws={"fontsize": 14, "fontweight": "bold"}
     )
     
     plt.xticks(rotation=0)
-    title = f"Jaccard Overlap@20 ({corpus_version.replace('_', ' ').title()})"
-    plt.title(title, y=1.02, fontsize=11, fontweight='bold')
+    plt.yticks(rotation=0)
+    title = f"Retrieval Overlap (Top-20)"
+    plt.title(title, pad=20, fontsize=14, fontweight='bold')
     
     plt.tight_layout()
     plt.savefig(output_file, dpi=300, bbox_inches='tight')
